@@ -114,6 +114,7 @@ PHP_FUNCTION(mb_stristr);
 PHP_FUNCTION(mb_strrichr);
 PHP_FUNCTION(mb_substr_count);
 PHP_FUNCTION(mb_substr);
+PHP_FUNCTION(mb_substr_ovr);
 PHP_FUNCTION(mb_strcut);
 PHP_FUNCTION(mb_strwidth);
 PHP_FUNCTION(mb_strimwidth);

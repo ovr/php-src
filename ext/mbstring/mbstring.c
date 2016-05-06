@@ -321,6 +321,14 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_mb_substr, 0, 0, 2)
 	ZEND_ARG_INFO(0, encoding)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_mb_substr_ovr, 0, 0, 2)
+	ZEND_ARG_INFO(0, str)
+	ZEND_ARG_INFO(0, start)
+	ZEND_ARG_INFO(0, length)
+	ZEND_ARG_INFO(0, encoding)
+ZEND_END_ARG_INFO()
+
+        
 ZEND_BEGIN_ARG_INFO_EX(arginfo_mb_strcut, 0, 0, 2)
 	ZEND_ARG_INFO(0, str)
 	ZEND_ARG_INFO(0, start)
@@ -539,6 +547,7 @@ const zend_function_entry mbstring_functions[] = {
 	PHP_FE(mb_strrichr,				arginfo_mb_strrichr)
 	PHP_FE(mb_substr_count,			arginfo_mb_substr_count)
 	PHP_FE(mb_substr,				arginfo_mb_substr)
+        PHP_FE(mb_substr_ovr,				arginfo_mb_substr_ovr)
 	PHP_FE(mb_strcut,				arginfo_mb_strcut)
 	PHP_FE(mb_strwidth,				arginfo_mb_strwidth)
 	PHP_FE(mb_strimwidth,			arginfo_mb_strimwidth)
@@ -2861,6 +2870,82 @@ PHP_FUNCTION(mb_substr_count)
 /* {{{ proto string mb_substr(string str, int start [, int length [, string encoding]])
    Returns part of a string */
 PHP_FUNCTION(mb_substr)
+{
+	char *str, *encoding = NULL;
+	zend_long from, len;
+	int mblen;
+	size_t str_len, encoding_len;
+	zend_bool len_is_null = 1;
+	mbfl_string string, result, *ret;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "sl|l!s", &str, &str_len, &from, &len, &len_is_null, &encoding, &encoding_len) == FAILURE) {
+		return;
+	}
+
+	mbfl_string_init(&string);
+	string.no_language = MBSTRG(language);
+	string.no_encoding = MBSTRG(current_internal_encoding)->no_encoding;
+
+	if (encoding) {
+		string.no_encoding = mbfl_name2no_encoding(encoding);
+		if (string.no_encoding == mbfl_no_encoding_invalid) {
+			php_error_docref(NULL, E_WARNING, "Unknown encoding \"%s\"", encoding);
+			RETURN_FALSE;
+		}
+	}
+
+	string.val = (unsigned char *)str;
+	string.len = str_len;
+
+	if (len_is_null) {
+		len = str_len;
+	}
+
+	/* measures length */
+	mblen = 0;
+	if (from < 0 || len < 0) {
+		mblen = mbfl_strlen(&string);
+	}
+
+	/* if "from" position is negative, count start position from the end
+	 * of the string
+	 */
+	if (from < 0) {
+		from = mblen + from;
+		if (from < 0) {
+			from = 0;
+		}
+	}
+
+	/* if "length" position is negative, set it to the length
+	 * needed to stop that many chars from the end of the string
+	 */
+	if (len < 0) {
+		len = (mblen - from) + len;
+		if (len < 0) {
+			len = 0;
+		}
+	}
+
+	if (((MBSTRG(func_overload) & MB_OVERLOAD_STRING) == MB_OVERLOAD_STRING)
+		&& (from >= mbfl_strlen(&string))) {
+		RETURN_FALSE;
+	}
+
+	ret = mbfl_substr(&string, &result, from, len);
+	if (NULL == ret) {
+		RETURN_FALSE;
+	}
+
+	// TODO: avoid reallocation ???
+	RETVAL_STRINGL((char *)ret->val, ret->len); /* the string is already strdup()'ed */
+	efree(ret->val);
+}
+/* }}} */
+
+/* {{{ proto string mb_substr_ovr(string str, int start [, int length [, string encoding]])
+   Returns part of a string */
+PHP_FUNCTION(mb_substr_ovr)
 {
 	char *str, *encoding = NULL;
 	zend_long from, len;
